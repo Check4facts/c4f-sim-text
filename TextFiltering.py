@@ -14,6 +14,7 @@ class TextFiltering:
         self.hf = hf
         if hf:
             self.model = SentenceTransformer("lighteternal/stsb-xlm-r-greek-transfer")
+            self.model = self.model.to("cuda")
             self.emb_dim = self.model.get_sentence_embedding_dimension()
 
     def chunk_text(self, text, chunk_size=1400, overlap_size=200):
@@ -76,34 +77,40 @@ class TextFiltering:
         return filtered_results
 
     def get_sim_text_hf(
-        self,
-        text,
-        claim_embedding,
-        min_threshold=0.3,
-        chunk_size=1400,
-    ):
-        if not text:
-            return []
-        # claim_embedding = self.model.encode(
-        #     self.claim, convert_to_tensor=True, show_progress_bar=False
-        # )
-        filtered_results = []
-        chunks = self.chunk_text(text, chunk_size)
-        if not chunks:
-            return []
-        # print("LEN OF CHUNKS OF THE FILE IS: ")
-        # print(len(chunks))
-        chunk_embeddings = self.model.encode(
-            chunks, convert_to_tensor=True, show_progress_bar=False
-        )
-        chunk_similarities = util.cos_sim(claim_embedding, chunk_embeddings)
-        for chunk, similarity in zip(chunks, chunk_similarities[0]):
-            if similarity >= min_threshold:
-                print(chunk)
-                print()
-                print(similarity)
-                print("--------------------------------------------------")
-                filtered_results.append(chunk)
-        if len(filtered_results) == 0:
-            return []
-        return filtered_results
+    self,
+    text,
+    claim_embedding,
+    min_threshold=0.3,
+    chunk_size=1400,
+):
+    if not text:
+        return []
+
+    device = self.model._target_device 
+
+    filtered_results = []
+    chunks = self.chunk_text(text, chunk_size)
+    if not chunks:
+        return []
+
+
+    claim_embedding = claim_embedding.to(device)
+
+    chunk_embeddings = self.model.encode(
+        chunks,
+        convert_to_tensor=True,
+        show_progress_bar=False,
+    )
+
+    chunk_similarities = util.cos_sim(claim_embedding, chunk_embeddings)
+
+    for chunk, similarity in zip(chunks, chunk_similarities[0]):
+        if similarity >= min_threshold:
+            print(chunk)
+            print()
+            print(similarity)
+            print("--------------------------------------------------")
+            filtered_results.append(chunk)
+
+    return filtered_results
+

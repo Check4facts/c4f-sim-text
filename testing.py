@@ -13,15 +13,15 @@ print("Hugging Face Claim Embedding:")
 print(hf_embedding[:10])
 print("--------------------------------------------")
 
-# Test Ollama embedding generation
-response_ollama = requests.post(
-    "http://127.0.0.1:8000/claim_embedding_ollama", json={"text": claim_text}
-)
-ollama_embedding = response_ollama.json()["embedding"]
+# # Test Ollama embedding generation
+# response_ollama = requests.post(
+#     "http://127.0.0.1:8000/claim_embedding_ollama", json={"text": claim_text}
+# )
+# ollama_embedding = response_ollama.json()["embedding"]
 
-print("Ollama Claim Embedding:")
-print(ollama_embedding[:10])
-print("--------------------------------------------")
+# print("Ollama Claim Embedding:")
+# print(ollama_embedding[:10])
+# print("--------------------------------------------")
 
 # Test HF similarity filtering
 supporting_text = """
@@ -43,17 +43,17 @@ print("Filtered Chunks (HF):")
 print(response_filter_hf.json())
 print("--------------------------------------------")
 
-# Test Ollama similarity filtering
-response_filter_ollama = requests.post(
-    "http://127.0.0.1:8000/sim_text_ollama",
-    json={
-        "text": supporting_text,
-        "claim_embedding": ollama_embedding,
-        "min_threshold": 0.3,
-        "chunk_size": 1400,
-    },
-)
+# # Test Ollama similarity filtering
+# response_filter_ollama = requests.post(
+#     "http://127.0.0.1:8000/sim_text_ollama",
+#     json={
+#         "text": supporting_text,
+#         "claim_embedding": ollama_embedding,
+#         "min_threshold": 0.3,
+#         "chunk_size": 1400,
+#     },
+# )
 
-print("Filtered Chunks (Ollama):")
-print(response_filter_ollama.json())
-print("--------------------------------------------")
+# print("Filtered Chunks (Ollama):")
+# print(response_filter_ollama.json())
+# print("--------------------------------------------")
