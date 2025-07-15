@@ -2,6 +2,7 @@ from OllamaEmbeddings import OllamaEmbeddings
 from sentence_transformers import SentenceTransformer
 from fastapi import FastAPI
 from sentence_transformers import util
+import torch
 
 import nltk
 
@@ -93,6 +94,8 @@ class TextFiltering:
         if not chunks:
             return []
 
+        if not torch.is_tensor(claim_embedding):
+            claim_embedding = torch.tensor(claim_embedding)
         claim_embedding = claim_embedding.to(device)
 
         chunk_embeddings = self.model.encode(
