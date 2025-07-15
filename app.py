@@ -3,6 +3,10 @@ from TextFiltering import TextFiltering
 from OllamaEmbeddings import OllamaEmbeddings
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
+import gc
+import torch
+from TextFiltering import TextFiltering
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -30,6 +34,13 @@ def sim_text_hf(request: SimTextRequest):
         min_threshold=request.min_threshold,
         chunk_size=request.chunk_size,
     )
+
+    # Cleanup
+    del handler
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
+
     return {
         "filtered_chunks": [
             chunk.strip().replace("\n", " ") for chunk in filtered_chunks
