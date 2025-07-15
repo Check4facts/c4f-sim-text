@@ -34,13 +34,8 @@ def sim_text_hf(request: SimTextRequest):
         min_threshold=request.min_threshold,
         chunk_size=request.chunk_size,
     )
-
-    # Cleanup
+    handler.cleanup()
     del handler
-    gc.collect()
-    torch.cuda.empty_cache()
-    torch.cuda.ipc_collect()
-
     return {
         "filtered_chunks": [
             chunk.strip().replace("\n", " ") for chunk in filtered_chunks

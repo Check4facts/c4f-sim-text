@@ -15,16 +15,11 @@ def log_gpu_memory(prefix=""):
 
 
 class TextFiltering:
-
-    model = None
-
     def __init__(self, hf):
         self.hf = hf
         if hf:
-            if TextFiltering.model is None:
-                model = SentenceTransformer("lighteternal/stsb-xlm-r-greek-transfer")
-                TextFiltering.model = model.to("cuda")
-            self.model = TextFiltering.model
+            model = SentenceTransformer("lighteternal/stsb-xlm-r-greek-transfer")
+            self.model = model.to("cuda")
             self.emb_dim = self.model.get_sentence_embedding_dimension()
 
     def chunk_text(self, text, chunk_size=1400, overlap_size=200):
@@ -87,7 +82,7 @@ class TextFiltering:
         if not text:
             return []
 
-        device = self.model._target_device
+        device = self.model.device
         filtered_results = []
         chunks = self.chunk_text(text, chunk_size)
         if not chunks:
@@ -138,4 +133,19 @@ class TextFiltering:
 
     def get_embedding(self, text):
         result = self.model.encode(text)
-        return result.tolist()
+        embedding = result.tolist()
+
+        # Cleanup after embedding
+        del self.model
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+
+        return embedding
+
+    def cleanup(self):
+        if hasattr(self, "model"):
+            del self.model
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
