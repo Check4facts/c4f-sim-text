@@ -1,21 +1,30 @@
 from OllamaEmbeddings import OllamaEmbeddings
 from sentence_transformers import SentenceTransformer
-from fastapi import FastAPI
 from sentence_transformers import util
 import torch
 import gc
 import nltk
 
-app = FastAPI()
+
+def log_gpu_memory(prefix=""):
+    allocated = torch.cuda.memory_allocated() / 1e6
+    reserved = torch.cuda.memory_reserved() / 1e6
+    print(
+        f"{prefix} GPU Memory - Allocated: {allocated:.2f}MB, Reserved: {reserved:.2f}MB"
+    )
 
 
 class TextFiltering:
 
+    model = None
+
     def __init__(self, hf):
         self.hf = hf
         if hf:
-            self.model = SentenceTransformer("lighteternal/stsb-xlm-r-greek-transfer")
-            self.model = self.model.to("cuda")
+            if TextFiltering.model is None:
+                model = SentenceTransformer("lighteternal/stsb-xlm-r-greek-transfer")
+                TextFiltering.model = model.to("cuda")
+            self.model = TextFiltering.model
             self.emb_dim = self.model.get_sentence_embedding_dimension()
 
     def chunk_text(self, text, chunk_size=1400, overlap_size=200):
@@ -26,17 +35,10 @@ class TextFiltering:
             if len(current_chunk) + len(sentence) <= chunk_size:
                 current_chunk += " " + sentence if current_chunk else sentence
             else:
-                # print(current_chunk)
-                # print("-----------------------------------")
                 chunks.append(current_chunk)
-                current_chunk = sentence[:overlap_size]
-                current_chunk += sentence[overlap_size:]
-
+                current_chunk = sentence[:overlap_size] + sentence[overlap_size:]
         if current_chunk:
-            # print(current_chunk)
-            # print("-----------------------------------")
             chunks.append(current_chunk)
-
         return chunks
 
     def get_sim_text_ollama(
@@ -72,9 +74,6 @@ class TextFiltering:
                 print("--------------------------------------------------")
                 filtered_results.append(chunk)
 
-        if len(filtered_results) == 0:
-            return []
-
         return filtered_results
 
     def get_sim_text_hf(
@@ -98,6 +97,8 @@ class TextFiltering:
             claim_embedding = torch.tensor(claim_embedding, dtype=torch.float32)
         claim_embedding = claim_embedding.to(device)
 
+        log_gpu_memory("Start")
+
         for i in range(0, len(chunks), batch_size):
             batch_chunks = chunks[i : i + batch_size]
 
@@ -119,15 +120,22 @@ class TextFiltering:
                         print("--------------------------------------------------")
                         filtered_results.append(chunk)
 
-            # Explicitly delete tensors and clear GPU cache after batch
-            del chunk_embeddings
-            del chunk_similarities
+            # Cleanup for each batch
+            del chunk_embeddings, chunk_similarities
             torch.cuda.empty_cache()
             torch.cuda.ipc_collect()
+            gc.collect()
+            log_gpu_memory(f"After batch {i // batch_size + 1}")
 
-        # Final cleanup after loop
+        # Final cleanup
         del claim_embedding
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
+        gc.collect()
+        log_gpu_memory("End")
 
         return filtered_results
+
+    def get_embedding(self, text):
+        result = self.model.encode(text)
+        return result.tolist()

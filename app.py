@@ -6,8 +6,8 @@ from sentence_transformers import SentenceTransformer
 
 app = FastAPI()
 
-hf_model = SentenceTransformer("lighteternal/stsb-xlm-r-greek-transfer")
-ollama_handler = OllamaEmbeddings()
+# hf_model = SentenceTransformer("lighteternal/stsb-xlm-r-greek-transfer")
+# ollama_handler = OllamaEmbeddings()
 
 
 class SimTextRequest(BaseModel):
@@ -37,30 +37,31 @@ def sim_text_hf(request: SimTextRequest):
     }
 
 
-@app.post("/sim_text_ollama")
-def sim_text_ollama(request: SimTextRequest):
-    handler = TextFiltering(hf=False)
-    filtered_chunks = handler.get_sim_text_ollama(
-        text=request.text,
-        claim_embedding=request.claim_embedding,
-        ollama_handler=ollama_handler,
-        min_threshold=request.min_threshold,
-        chunk_size=request.chunk_size,
-    )
-    return {
-        "filtered_chunks": [
-            chunk.strip().replace("\n", " ") for chunk in filtered_chunks
-        ]
-    }
+# @app.post("/sim_text_ollama")
+# def sim_text_ollama(request: SimTextRequest):
+#     handler = TextFiltering(hf=False)
+#     filtered_chunks = handler.get_sim_text_ollama(
+#         text=request.text,
+#         claim_embedding=request.claim_embedding,
+#         ollama_handler=ollama_handler,
+#         min_threshold=request.min_threshold,
+#         chunk_size=request.chunk_size,
+#     )
+#     return {
+#         "filtered_chunks": [
+#             chunk.strip().replace("\n", " ") for chunk in filtered_chunks
+#         ]
+#     }
 
 
 @app.post("/claim_embedding_hf")
 def claim_embedding_hf(request: EmbeddingRequest):
-    embedding = hf_model.encode(request.text).tolist()
+    handler = TextFiltering(hf=True)
+    embedding = handler.get_embedding(request.text)
     return {"embedding": embedding}
 
 
-@app.post("/claim_embedding_ollama")
-def claim_embedding_ollama(request: EmbeddingRequest):
-    embedding = ollama_handler.compute_embedding(request.text)
-    return {"embedding": embedding.tolist()}
+# @app.post("/claim_embedding_ollama")
+# def claim_embedding_ollama(request: EmbeddingRequest):
+#     embedding = ollama_handler.compute_embedding(request.text)
+#     return {"embedding": embedding.tolist()}
