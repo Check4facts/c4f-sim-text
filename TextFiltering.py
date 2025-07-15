@@ -83,30 +83,30 @@ class TextFiltering:
         claim_embedding,
         min_threshold=0.3,
         chunk_size=1400,
-        batch_size=16,  # new batch size parameter
+        batch_size=16,
     ):
         if not text:
             return []
 
         device = self.model._target_device
-
         filtered_results = []
         chunks = self.chunk_text(text, chunk_size)
         if not chunks:
             return []
 
         if not torch.is_tensor(claim_embedding):
-            claim_embedding = torch.tensor(claim_embedding)
+            claim_embedding = torch.tensor(claim_embedding, dtype=torch.float32)
         claim_embedding = claim_embedding.to(device)
 
-        with torch.no_grad():  # disable grad to save memory
-            for i in range(0, len(chunks), batch_size):
-                batch_chunks = chunks[i : i + batch_size]
+        for i in range(0, len(chunks), batch_size):
+            batch_chunks = chunks[i : i + batch_size]
+
+            with torch.no_grad():
                 chunk_embeddings = self.model.encode(
                     batch_chunks,
                     convert_to_tensor=True,
                     show_progress_bar=False,
-                    device=device,  # ensure encoding on the correct device
+                    device=device,
                 )
 
                 chunk_similarities = util.cos_sim(claim_embedding, chunk_embeddings)
@@ -119,14 +119,15 @@ class TextFiltering:
                         print("--------------------------------------------------")
                         filtered_results.append(chunk)
 
-                del chunk_embeddings
-                del chunk_similarities
-                torch.cuda.empty_cache()
-                gc.collect()
+            # Explicitly delete tensors and clear GPU cache after batch
+            del chunk_embeddings
+            del chunk_similarities
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
 
-        # Clean up claim_embedding after use
+        # Final cleanup after loop
         del claim_embedding
         torch.cuda.empty_cache()
-        gc.collect()
+        torch.cuda.ipc_collect()
 
         return filtered_results
