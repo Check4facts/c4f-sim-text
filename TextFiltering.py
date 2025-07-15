@@ -83,6 +83,7 @@ class TextFiltering:
         claim_embedding,
         min_threshold=0.3,
         chunk_size=1400,
+        batch_size=16,  # new batch size parameter
     ):
         if not text:
             return []
@@ -98,20 +99,26 @@ class TextFiltering:
             claim_embedding = torch.tensor(claim_embedding)
         claim_embedding = claim_embedding.to(device)
 
-        chunk_embeddings = self.model.encode(
-            chunks,
-            convert_to_tensor=True,
-            show_progress_bar=False,
-        )
+        for i in range(0, len(chunks), batch_size):
+            batch_chunks = chunks[i : i + batch_size]
+            chunk_embeddings = self.model.encode(
+                batch_chunks,
+                convert_to_tensor=True,
+                show_progress_bar=False,
+                device=device,  # ensure encoding on the correct device
+            )
 
-        chunk_similarities = util.cos_sim(claim_embedding, chunk_embeddings)
+            chunk_similarities = util.cos_sim(claim_embedding, chunk_embeddings)
 
-        for chunk, similarity in zip(chunks, chunk_similarities[0]):
-            if similarity >= min_threshold:
-                print(chunk)
-                print()
-                print(similarity)
-                print("--------------------------------------------------")
-                filtered_results.append(chunk)
+            for chunk, similarity in zip(batch_chunks, chunk_similarities[0]):
+                if similarity >= min_threshold:
+                    print(chunk)
+                    print()
+                    print(similarity.item())  # print scalar float instead of tensor
+                    print("--------------------------------------------------")
+                    filtered_results.append(chunk)
+
+            # Clear cache after each batch
+            torch.cuda.empty_cache()
 
         return filtered_results
