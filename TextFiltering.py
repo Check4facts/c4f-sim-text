@@ -3,7 +3,7 @@ from sentence_transformers import SentenceTransformer
 from fastapi import FastAPI
 from sentence_transformers import util
 import torch
-
+import gc
 import nltk
 
 app = FastAPI()
@@ -99,26 +99,34 @@ class TextFiltering:
             claim_embedding = torch.tensor(claim_embedding)
         claim_embedding = claim_embedding.to(device)
 
-        for i in range(0, len(chunks), batch_size):
-            batch_chunks = chunks[i : i + batch_size]
-            chunk_embeddings = self.model.encode(
-                batch_chunks,
-                convert_to_tensor=True,
-                show_progress_bar=False,
-                device=device,  # ensure encoding on the correct device
-            )
+        with torch.no_grad():  # disable grad to save memory
+            for i in range(0, len(chunks), batch_size):
+                batch_chunks = chunks[i : i + batch_size]
+                chunk_embeddings = self.model.encode(
+                    batch_chunks,
+                    convert_to_tensor=True,
+                    show_progress_bar=False,
+                    device=device,  # ensure encoding on the correct device
+                )
 
-            chunk_similarities = util.cos_sim(claim_embedding, chunk_embeddings)
+                chunk_similarities = util.cos_sim(claim_embedding, chunk_embeddings)
 
-            for chunk, similarity in zip(batch_chunks, chunk_similarities[0]):
-                if similarity >= min_threshold:
-                    print(chunk)
-                    print()
-                    print(similarity.item())  # print scalar float instead of tensor
-                    print("--------------------------------------------------")
-                    filtered_results.append(chunk)
+                for chunk, similarity in zip(batch_chunks, chunk_similarities[0]):
+                    if similarity >= min_threshold:
+                        print(chunk)
+                        print()
+                        print(similarity.item())
+                        print("--------------------------------------------------")
+                        filtered_results.append(chunk)
 
-            # Clear cache after each batch
-            torch.cuda.empty_cache()
+                del chunk_embeddings
+                del chunk_similarities
+                torch.cuda.empty_cache()
+                gc.collect()
+
+        # Clean up claim_embedding after use
+        del claim_embedding
+        torch.cuda.empty_cache()
+        gc.collect()
 
         return filtered_results
